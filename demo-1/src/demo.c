@@ -120,7 +120,7 @@ static int do_my_work(struct mnl_socket *sock_ctx, const char rtgen_family_str[]
 		ret = mnl_socket_recvfrom(sock_ctx, buf, sizeof(buf));
 	}
 	if (ret == -1) {
-		perror("error");
+		perror("mnl_socket_recvfrom / mnl_cb_run");
 		return(EXIT_FAILURE);
 	}
 
