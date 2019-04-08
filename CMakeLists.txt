@@ -17,7 +17,7 @@ find_package(PkgConfig REQUIRED)
 
 pkg_check_modules(LIBMNL REQUIRED libmnl)
 find_library(LIBMNL_LIBRARIES
-  NAMES tasn1
+  NAMES mnl
   HINTS ${LIBMNL_LIBDIR} ${LIBMNL_LIBRARY_DIRS}
 )
 
