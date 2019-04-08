@@ -80,60 +80,79 @@ static int data_cb(const struct nlmsghdr *nlh, void *data)
 	return MNL_CB_OK;
 }
 
+int do_my_work(struct mnl_socket *sock_ctx, const char rtgen_family_str[])
+{
+	char buf[MNL_SOCKET_BUFFER_SIZE];
+	struct nlmsghdr *header;
+	struct rtgenmsg *extra;
+	int ret;
+	unsigned int seq;
+	unsigned int portid;
+
+	header = mnl_nlmsg_put_header(buf);
+	header->nlmsg_type = RTM_GETADDR;
+	header->nlmsg_flags = NLM_F_REQUEST | NLM_F_DUMP;
+	header->nlmsg_seq = seq = time(NULL);
+	extra = mnl_nlmsg_put_extra_header(header, sizeof(*extra));
+
+	extra->rtgen_family = AF_INET;
+	if (rtgen_family_str && strcmp(rtgen_family_str, "inet6") == 0) {
+		extra->rtgen_family = AF_INET6;
+	}
+
+	if (mnl_socket_bind(sock_ctx, 0, MNL_SOCKET_AUTOPID) < 0) {
+		perror("mnl_socket_bind");
+		return(EXIT_FAILURE);
+	}
+	portid = mnl_socket_get_portid(sock_ctx);
+
+	if (mnl_socket_sendto(sock_ctx, header, header->nlmsg_len) < 0) {
+		perror("mnl_socket_sendto");
+		return(EXIT_FAILURE);
+	}
+
+	ret = mnl_socket_recvfrom(sock_ctx, buf, sizeof(buf));
+	while (ret > 0) {
+		ret = mnl_cb_run(buf, ret, seq, portid, data_cb, NULL);
+		if (ret <= MNL_CB_STOP) {
+			break;
+		}
+		ret = mnl_socket_recvfrom(sock_ctx, buf, sizeof(buf));
+	}
+	if (ret == -1) {
+		perror("error");
+		return(EXIT_FAILURE);
+	}
+
+	return(EXIT_SUCCESS);
+}
+
 int main(int argc, char *argv[])
 {
-	struct mnl_socket *nl;
-	char buf[MNL_SOCKET_BUFFER_SIZE];
-	struct nlmsghdr *nlh;
-	struct rtgenmsg *rt;
-	int ret;
-	unsigned int seq, portid;
+	struct mnl_socket *sock_ctx;
+	const char *str;
 
-	if (argc != 2) {
-		fprintf(stderr, "Usage: %s <inet|inet6>\n", argv[0]);
+	if (argc > 2) {
+		fprintf(stderr, "Usage: %s\n", argv[0]);
+		fprintf(stderr, "       %s -4\n", argv[0]);
+		fprintf(stderr, "       %s -6\n", argv[0]);
 		exit(EXIT_FAILURE);
 	}
 
-	nlh = mnl_nlmsg_put_header(buf);
-	nlh->nlmsg_type	= RTM_GETADDR;
-	nlh->nlmsg_flags = NLM_F_REQUEST | NLM_F_DUMP;
-	nlh->nlmsg_seq = seq = time(NULL);
-	rt = mnl_nlmsg_put_extra_header(nlh, sizeof(struct rtgenmsg));
-	if (strcmp(argv[1], "inet") == 0)
-		rt->rtgen_family = AF_INET;
-	else if (strcmp(argv[1], "inet6") == 0)
-		rt->rtgen_family = AF_INET6;
-
-	nl = mnl_socket_open(NETLINK_ROUTE);
-	if (nl == NULL) {
+	sock_ctx = mnl_socket_open(NETLINK_ROUTE);
+	if (sock_ctx == NULL) {
 		perror("mnl_socket_open");
 		exit(EXIT_FAILURE);
 	}
 
-	if (mnl_socket_bind(nl, 0, MNL_SOCKET_AUTOPID) < 0) {
-		perror("mnl_socket_bind");
-		exit(EXIT_FAILURE);
-	}
-	portid = mnl_socket_get_portid(nl);
-
-	if (mnl_socket_sendto(nl, nlh, nlh->nlmsg_len) < 0) {
-		perror("mnl_socket_sendto");
-		exit(EXIT_FAILURE);
+	str = "";
+	if (argc == 2 && strcmp(argv[1], "-6") == 0) {
+		str = "inet6";
 	}
 
-	ret = mnl_socket_recvfrom(nl, buf, sizeof(buf));
-	while (ret > 0) {
-		ret = mnl_cb_run(buf, ret, seq, portid, data_cb, NULL);
-		if (ret <= MNL_CB_STOP)
-			break;
-		ret = mnl_socket_recvfrom(nl, buf, sizeof(buf));
-	}
-	if (ret == -1) {
-		perror("error");
-		exit(EXIT_FAILURE);
-	}
+	do_my_work(sock_ctx, str);
 
-	mnl_socket_close(nl);
+	mnl_socket_close(sock_ctx);
 
 	return 0;
 }
