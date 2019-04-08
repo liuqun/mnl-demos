@@ -80,7 +80,7 @@ static int data_cb(const struct nlmsghdr *nlh, void *data)
 	return MNL_CB_OK;
 }
 
-static int do_my_work(struct mnl_socket *sock_ctx, const char rtgen_family_str[])
+static int dump_current_ip_addresses(struct mnl_socket *sock_ctx, char c_ipv4v6_select)
 {
 	char buf[MNL_SOCKET_BUFFER_SIZE];
 	struct nlmsghdr *header;
@@ -96,7 +96,7 @@ static int do_my_work(struct mnl_socket *sock_ctx, const char rtgen_family_str[]
 	extra = mnl_nlmsg_put_extra_header(header, sizeof(*extra));
 
 	extra->rtgen_family = AF_INET;
-	if (rtgen_family_str && strcmp(rtgen_family_str, "inet6") == 0) {
+	if (c_ipv4v6_select == '6') {
 		extra->rtgen_family = AF_INET6;
 	}
 
@@ -130,7 +130,8 @@ static int do_my_work(struct mnl_socket *sock_ctx, const char rtgen_family_str[]
 int main(int argc, char *argv[])
 {
 	struct mnl_socket *sock_ctx;
-	const char *str;
+	char c_ipv4v6;
+	int err_code;
 
 	if (argc > 2) {
 		fprintf(stderr, "Usage: %s\n", argv[0]);
@@ -139,20 +140,22 @@ int main(int argc, char *argv[])
 		exit(EXIT_FAILURE);
 	}
 
-	sock_ctx = mnl_socket_open(NETLINK_ROUTE);
-	if (sock_ctx == NULL) {
+	if ((sock_ctx = mnl_socket_open(NETLINK_ROUTE)) == NULL) {
 		perror("mnl_socket_open");
 		exit(EXIT_FAILURE);
 	}
 
-	str = "";
+	c_ipv4v6 = '4';
 	if (argc == 2 && strcmp(argv[1], "-6") == 0) {
-		str = "inet6";
+		c_ipv4v6 = '6';
 	}
 
-	do_my_work(sock_ctx, str);
+	err_code = dump_current_ip_addresses(sock_ctx, c_ipv4v6);
+	if (err_code) {
+		fprintf(stderr, "Error code = %d\n", err_code);
+	}
 
 	mnl_socket_close(sock_ctx);
 
-	return 0;
+	return err_code;
 }
