@@ -80,7 +80,7 @@ static int data_cb(const struct nlmsghdr *nlh, void *data)
 	return MNL_CB_OK;
 }
 
-int do_my_work(struct mnl_socket *sock_ctx, const char rtgen_family_str[])
+static int do_my_work(struct mnl_socket *sock_ctx, const char rtgen_family_str[])
 {
 	char buf[MNL_SOCKET_BUFFER_SIZE];
 	struct nlmsghdr *header;
