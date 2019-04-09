@@ -1,0 +1,6 @@
+config DEMO2
+	tristate "NETLINK: My demo2 module for genl netlink test"
+	depends on NET && INET
+	default m
+	help
+	  My demo2 test module

@@ -1,0 +1,2 @@
+demo2-y := main.o
+obj-$(if $(KBUILD_EXTMOD),m,$(CONFIG_DEMO2)) := demo2.o
