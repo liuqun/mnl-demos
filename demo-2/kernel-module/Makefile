@@ -15,6 +15,7 @@ modules:
 	$(MAKE) -C $(KERNELDIR) M=$(PWD) modules
 
 .PHONY: install
+install:
 	$(MAKE) -C $(KERNELDIR) M=$(PWD) modules_install
 
 .PHONY: clean
