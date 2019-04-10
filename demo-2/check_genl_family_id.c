@@ -206,7 +206,6 @@ static int fetch_and_print_family_info_by_family_name(struct mnl_socket *nl_ctx,
 	extra->cmd = CTRL_CMD_GETFAMILY;
 	extra->version = 1;
 
-	mnl_attr_put_u32(header, CTRL_ATTR_FAMILY_ID, GENL_ID_CTRL);
 	mnl_attr_put_strz(header, CTRL_ATTR_FAMILY_NAME, family_name_strz);
 
 	if (mnl_socket_bind(nl_ctx, 0, MNL_SOCKET_AUTOPID) < 0) {
