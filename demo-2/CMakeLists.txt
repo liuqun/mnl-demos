@@ -1,6 +1,9 @@
 cmake_minimum_required(VERSION 3.1)
 project(demo LANGUAGES C)
-set(demo_SOURCES "check_genl_family_id.c")
+set(demo_SOURCES
+  "main.c"
+  "check_genl_family_id.c"
+)
 add_executable(check_genl_family_id ${demo_SOURCES})
 
 find_package(PkgConfig REQUIRED)

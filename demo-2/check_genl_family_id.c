@@ -183,57 +183,73 @@ static int data_cb(const struct nlmsghdr *nlh, void *data)
 	return MNL_CB_OK;
 }
 
-int main(int argc, char *argv[])
+static int fetch_and_print_family_info_by_family_name(struct mnl_socket *nl_ctx, const char *family_name_strz)
 {
-	struct mnl_socket *nl;
-	char buf[MNL_SOCKET_BUFFER_SIZE];
-	struct nlmsghdr *nlh;
-	struct genlmsghdr *genl;
+	char sendbuf[MNL_SOCKET_BUFFER_SIZE];
+	char recvbuf[MNL_SOCKET_BUFFER_SIZE];
+	struct nlmsghdr *header;
+	struct genlmsghdr *extra;
+	unsigned int seq;
+	unsigned int portid;
 	int ret;
-	unsigned int seq, portid;
+	const int ENABLE_MY_DEBUG = 1;
 
-	nlh = mnl_nlmsg_put_header(buf);
-	nlh->nlmsg_type	= GENL_ID_CTRL;
-	nlh->nlmsg_flags = NLM_F_REQUEST | NLM_F_ACK;
-	nlh->nlmsg_seq = seq = time(NULL);
-
-	genl = mnl_nlmsg_put_extra_header(nlh, sizeof(struct genlmsghdr));
-	genl->cmd = CTRL_CMD_GETFAMILY;
-	genl->version = 1;
-
-	mnl_attr_put_u32(nlh, CTRL_ATTR_FAMILY_ID, GENL_ID_CTRL);
-    mnl_attr_put_strz(nlh, CTRL_ATTR_FAMILY_NAME, "DEMO_GEN_CTRL");
-
-	nl = mnl_socket_open(NETLINK_GENERIC);
-	if (nl == NULL) {
-		perror("mnl_socket_open");
-		exit(EXIT_FAILURE);
+	if (ENABLE_MY_DEBUG) {
+		header = NULL;
+		extra = NULL;
 	}
+	header = mnl_nlmsg_put_header(sendbuf);
+	header->nlmsg_type = GENL_ID_CTRL;
+	header->nlmsg_flags = NLM_F_REQUEST | NLM_F_ACK;
+	header->nlmsg_seq = seq = time(NULL);
+	extra = mnl_nlmsg_put_extra_header(header, sizeof(*extra));
+	extra->cmd = CTRL_CMD_GETFAMILY;
+	extra->version = 1;
 
-	if (mnl_socket_bind(nl, 0, MNL_SOCKET_AUTOPID) < 0) {
+	mnl_attr_put_u32(header, CTRL_ATTR_FAMILY_ID, GENL_ID_CTRL);
+	mnl_attr_put_strz(header, CTRL_ATTR_FAMILY_NAME, family_name_strz);
+
+	if (mnl_socket_bind(nl_ctx, 0, MNL_SOCKET_AUTOPID) < 0) {
 		perror("mnl_socket_bind");
-		exit(EXIT_FAILURE);
+		return(EXIT_FAILURE);
 	}
-	portid = mnl_socket_get_portid(nl);
+	portid = mnl_socket_get_portid(nl_ctx);
 
-	if (mnl_socket_sendto(nl, nlh, nlh->nlmsg_len) < 0) {
+	if (mnl_socket_sendto(nl_ctx, header, header->nlmsg_len) < 0) {
 		perror("mnl_socket_sendto");
-		exit(EXIT_FAILURE);
+		return(EXIT_FAILURE);
 	}
 
-	ret = mnl_socket_recvfrom(nl, buf, sizeof(buf));
-	while (ret > 0) {
-		ret = mnl_cb_run(buf, ret, seq, portid, data_cb, NULL);
-		if (ret <= 0)
+	while ((ret = mnl_socket_recvfrom(nl_ctx, recvbuf, sizeof(recvbuf))) > 0) {
+		ret = mnl_cb_run(recvbuf, ret, seq, portid, data_cb, NULL);
+		if (ret <= 0) {
 			break;
-		ret = mnl_socket_recvfrom(nl, buf, sizeof(buf));
+		}
 	}
 	if (ret == -1) {
-		perror("error");
-		exit(EXIT_FAILURE);
+		fprintf(stderr, "Warning: mnl_socket_recvfrom() OR mnl_cb_run() failed\n");
+		return(EXIT_FAILURE);
 	}
 
-	mnl_socket_close(nl);
+	return(0);
+}
 
-	return 0;
+#include "my_functions.h"
+int print_genl_family_info_by_family_name_strz(const char *family_name_strz)
+{
+	int errcode;
+	struct mnl_socket *ctx;
+
+	ctx = mnl_socket_open(NETLINK_GENERIC);
+	if (!ctx) {
+		perror("mnl_socket_open");
+		return(EXIT_FAILURE);
+	}
+	errcode = fetch_and_print_family_info_by_family_name(ctx, family_name_strz);
+	mnl_socket_close(ctx);
+
+	if (errcode) {
+		return(EXIT_FAILURE);
+	}
+	return(0);
 }
