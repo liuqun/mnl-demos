@@ -118,7 +118,8 @@ static int demo_get_family_id(int sd)
     struct msgtemplate ans;
 
     char name[100];
-    int id = 0, ret;
+    int id = -1;
+    int ret;
     struct nlattr *na;
     int rep_len;
 
@@ -126,14 +127,16 @@ static int demo_get_family_id(int sd)
     strcpy(name, DEMO_GENL_NAME);
     ret = demo_send_cmd(sd, GENL_ID_CTRL, getpid(), CTRL_CMD_GETFAMILY,
             CTRL_ATTR_FAMILY_NAME, (void *) name, strlen(DEMO_GENL_NAME) + 1);
-    if (ret < 0)
-        return 0;
+    if (ret < 0) {
+        return -1;
+    }
 
     /* 接收内核消息 */
     rep_len = recv(sd, &ans, sizeof(ans), 0);
     if (ans.n.nlmsg_type == NLMSG_ERROR || (rep_len < 0)
-            || !NLMSG_OK((&ans.n), rep_len))
-        return 0;
+            || !NLMSG_OK((&ans.n), rep_len)) {
+        return -1;
+    }
 
     /* 解析family id */
     na = (struct nlattr *) GENLMSG_DATA(&ans);
@@ -230,8 +233,8 @@ int main(int argc, char* argv[])
 
     /* 获取family id */
     nl_family_id = demo_get_family_id(nl_fd);
-    if (!nl_family_id) {
-        fprintf(stderr, "Error getting family id, errno %d\n", errno);
+    if (nl_family_id < 0) {
+        fprintf(stderr, "Error getting family id\n");
         goto out;
     }
     PRINTF("family id %d\n", nl_family_id);
