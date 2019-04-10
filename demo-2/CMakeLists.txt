@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 3.1)
 project(demo LANGUAGES C)
 set(demo_SOURCES
   "main.c"
+  "get_genl_family_id.c"
   "check_genl_family_id.c"
 )
 add_executable(check_genl_family_id ${demo_SOURCES})
