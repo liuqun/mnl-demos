@@ -116,23 +116,25 @@ void run_my_test(int genl_family_id)
 	mnl_socket_close(nl_ctx);
 }
 
-const int DEBUG_ENABLED = 0;
-
 int main(int argc, char *argv[])
 {
+	const int DEBUG_ENABLED = 1;
+	const char name[] = DEMO_GENL_NAME;
 	int id;
 
-	id = get_genl_family_id_by_name("DEMO_GEN_CTRL");
+	id = get_genl_family_id_by_name(name);
 	if (id < 0) {
-		fprintf(stderr, "Error: DEMO_GEN_CTRL family does NOT exist\n");
+		fprintf(stderr, "Error: family name does NOT exist\n");
 		fprintf(stderr, "(please load demo2.ko kernel module first...)\n");
 		return(255);
 	}
-	printf("Demo2 genl family: name=DEMO_GEN_CTRL, id=%d\n", id);
+	printf("Demo2 genl family: name[] = DEMO_GENL_NAME =\"%s\", id=%d\n", name, id);
 	if (DEBUG_ENABLED) {
-		print_genl_family_info_by_family_name_strz("DEMO_GEN_CTRL");
+		print_genl_family_info_by_family_name_strz(name);
 	}
 
+	printf("==== Test start ====\n");
 	run_my_test(id);
+	printf("==== Test finish ====\n");
 	return(0);
 }
