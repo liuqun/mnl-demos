@@ -80,7 +80,7 @@ static int data_cb(const struct nlmsghdr *nlh, void *data)
 	return MNL_CB_OK;
 }
 
-static int dump_current_ip_addresses(struct mnl_socket *sock_ctx, char c_ipv4v6_select)
+static int run_foobar_test(struct mnl_socket *sock_ctx, char c_ipv4v6_select)
 {
 	char buf[MNL_SOCKET_BUFFER_SIZE];
 	struct nlmsghdr *header;
@@ -127,9 +127,106 @@ static int dump_current_ip_addresses(struct mnl_socket *sock_ctx, char c_ipv4v6_
 	return(EXIT_SUCCESS);
 }
 
+typedef struct ctx *ctx_ptr_t;
+struct ctx {
+	int ipv4v6_selector;
+	int mnl_socket_is_opened;
+	struct mnl_socket *mnl_ptr; // netlink handler ptr
+};
+
+static struct ctx UndefinedContext = {.ipv4v6_selector='4', .mnl_socket_is_opened=0, .mnl_ptr=NULL,};
+static void * const UNDEFINED_PTR = (void *) (&UndefinedContext);
+
+/** allocate memory for program context structure */
+ctx_ptr_t ctx_malloc(void)
+{
+	void *ret = UNDEFINED_PTR; // 确保本函数返回的指针是有效指针(避免返回空指针), 配合函数ctx_is_valid(ctx_ptr_t ptr)进行返回值判断
+	ctx_ptr_t ptr = NULL;
+
+	ptr = malloc(sizeof(*ptr));
+	if (!ptr) {
+		// 内存不足?(几乎不可能发生)
+		return(UNDEFINED_PTR);
+	}
+	ret = ptr;
+	ptr->ipv4v6_selector = '4';
+	ptr->mnl_socket_is_opened = 0;
+	return(ret);
+}
+
+#include <assert.h>
+
+/** check the context structure (successfully allocated or not) */
+int ctx_is_valid(struct ctx *ptr)
+{
+	assert(ptr != NULL);
+
+	if ((ctx_ptr_t)UNDEFINED_PTR == ptr || !ptr) {
+		return(0); // 0代表ctx无效
+	}
+	return(1); // 1代表ctx有效
+}
+
+char ctx_get_ipv4v6_selector(struct ctx *ptr)
+{
+	assert(ctx_is_valid(ptr));
+	return((char) (ptr->ipv4v6_selector & 0x7F));
+}
+
+void ctx_set_ipv4v6_selector(struct ctx *ptr, char c_ipv4v6_selector)
+{
+	assert(ctx_is_valid(ptr));
+	ptr->ipv4v6_selector = c_ipv4v6_selector;
+}
+
+/** run test */
+void ctx_run_my_test(struct ctx *ptr)
+{
+	assert(ctx_is_valid(ptr));
+
+	if (!ptr->mnl_socket_is_opened) {
+		ptr->mnl_ptr = mnl_socket_open(NETLINK_ROUTE);
+		if (!ptr->mnl_ptr) {
+			return; // 发生错误时,返回的ptr->mnl_socket_is_opened等于0;
+		}
+		ptr->mnl_socket_is_opened = 1;
+	}
+	run_foobar_test(ptr->mnl_ptr, ptr->ipv4v6_selector);
+	mnl_socket_close(ptr->mnl_ptr);
+	ptr->mnl_socket_is_opened = 0;
+	return;
+}
+
+void ctx_free(ctx_ptr_t ptr)
+{
+	if (!ptr) {
+		return;
+	}
+	if (ptr->mnl_socket_is_opened) {
+		/* Note: 关闭当前已打开的socket文件描述符 */
+		mnl_socket_close(ptr->mnl_ptr);
+		ptr->mnl_socket_is_opened = 0;
+	}
+	free(ptr);
+}
+
+static int dump_current_ip_addresses(char c_ipv4v6_selector)
+{
+	ctx_ptr_t ctx;
+
+	ctx = ctx_malloc();
+	if (!ctx_is_valid(ctx)) {
+		return(-1);
+	}
+	ctx_set_ipv4v6_selector(ctx, c_ipv4v6_selector);
+	ctx_run_my_test(ctx);
+	ctx_free(ctx);
+	ctx = NULL;
+	return (0);
+}
+
 int main(int argc, char *argv[])
 {
-	struct mnl_socket *sock_ctx;
 	char c_ipv4v6;
 	int err_code;
 
@@ -140,22 +237,11 @@ int main(int argc, char *argv[])
 		exit(EXIT_FAILURE);
 	}
 
-	if ((sock_ctx = mnl_socket_open(NETLINK_ROUTE)) == NULL) {
-		perror("mnl_socket_open");
-		exit(EXIT_FAILURE);
-	}
-
 	c_ipv4v6 = '4';
 	if (argc == 2 && strcmp(argv[1], "-6") == 0) {
 		c_ipv4v6 = '6';
 	}
 
-	err_code = dump_current_ip_addresses(sock_ctx, c_ipv4v6);
-	if (err_code) {
-		fprintf(stderr, "Error code = %d\n", err_code);
-	}
-
-	mnl_socket_close(sock_ctx);
-
-	return err_code;
+	dump_current_ip_addresses(c_ipv4v6);
+	return 0;
 }
